@@ -1,0 +1,70 @@
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
+
+# Пример данных о товарах
+products = {
+    "1": {"name": "Товар 1", "price": 100},
+    "2": {"name": "Товар 2", "price": 200},
+    "3": {"name": "Товар 3", "price": 300},
+}
+
+# Корзина пользователя
+user_cart = {}
+
+def start(update: Update, context: CallbackContext) -> None:
+    update.message.reply_text("Добро пожаловать в магазин! Используйте /products для просмотра товаров.")
+
+def show_products(update: Update, context: CallbackContext) -> None:
+    keyboard = [
+        [InlineKeyboardButton(f"{product['name']} - {product['price']} руб.", callback_data=product_id)]
+        for product_id, product in products.items()
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    update.message.reply_text("Выберите товар:", reply_markup=reply_markup)
+
+def add_to_cart(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    product_id = query.data
+    user_id = query.from_user.id
+
+    if user_id not in user_cart:
+        user_cart[user_id] = []
+
+    user_cart[user_id].append(products[product_id])
+    query.answer(f"Товар {products[product_id]['name']} добавлен в корзину!")
+
+def show_cart(update: Update, context: CallbackContext) -> None:
+    user_id = update.message.from_user.id
+    if user_id in user_cart and user_cart[user_id]:
+        cart_items = "\n".join([f"{item['name']} - {item['price']} руб." for item in user_cart[user_id]])
+        total = sum(item['price'] for item in user_cart[user_id])
+        update.message.reply_text(f"Ваша корзина:\n{cart_items}\nОбщая сумма: {total} руб.")
+    else:
+        update.message.reply_text("Ваша корзина пуста.")
+
+def checkout(update: Update, context: CallbackContext) -> None:
+    user_id = update.message.from_user.id
+    if user_id in user_cart and user_cart[user_id]:
+        total = sum(item['price'] for item in user_cart[user_id])
+        update.message.reply_text(f"Спасибо за покупку! Общая сумма заказа: {total} руб.")
+        user_cart[user_id] = []
+    else:
+        update.message.reply_text("Ваша корзина пуста.")
+
+def main() -> None:
+    # Вставьте сюда ваш токен
+    updater = Updater("YOUR_TELEGRAM_BOT_TOKEN")
+
+    dispatcher = updater.dispatcher
+
+    dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(CommandHandler("products", show_products))
+    dispatcher.add_handler(CommandHandler("cart", show_cart))
+    dispatcher.add_handler(CommandHandler("checkout", checkout))
+    dispatcher.add_handler(CallbackQueryHandler(add_to_cart))
+
+    updater.start_polling()
+    updater.idle()
+
+if __name__ == '__main__':
+    main()
